@@ -335,7 +335,7 @@ def update_me(current_user_id, current_user_is_admin, *args, **kwargs):
 
 @app.route('/users/me', methods=['DELETE'])
 @token_required
-def delete_employee(current_user_id, current_user_is_admin, *args, **kwargs):
+def delete_users(current_user_id, current_user_is_admin, *args, **kwargs):
 
 
     try:
@@ -369,4 +369,433 @@ def delete_employee(current_user_id, current_user_is_admin, *args, **kwargs):
 
 
 
+@app.route('/habits', methods=['POST'])
+@token_required
+def create_habit(current_user_id, current_user_is_admin, *args, **kwargs):
+    try:
+        data = request.get_json()
+        if not data:
+            return jsonify({"error": "No data provided"}), 400 #status 400 = Bad Request
 
+
+        cnx = get_db_connection()
+        cursor = cnx.cursor(prepared=True)
+
+
+        query = ("INSERT INTO Habits (HabitName, UserID, HabitDescription) VALUES (%s, %s, %s)")
+        values = (data['HabitName'], current_user_id, data['HabitDescription'])
+        cursor.execute(query, values)
+        cnx.commit()
+
+        return jsonify({"message": "Habit created"}), 201 #status 201 = Created
+
+    except Exception as e:
+        print(f"Database error: {e}")
+        return jsonify({"error": "Internal Server Error", "message": str(e)}), 500 #status 500 = Server Error
+
+    finally:
+        if 'cursor' in locals():
+            cursor.close()
+        if 'cnx' in locals():
+            cnx.close()
+
+
+
+#get specific habit by ID
+@app.route('/habits/<int:habit_id>', methods=['GET'])
+@token_required
+def get_habit(current_user_id, current_user_is_admin, *args, **kwargs):
+    
+    habit_id = kwargs['habit_id']
+    try:
+        cnx = get_db_connection()
+        cursor = cnx.cursor()   
+        query = ("SELECT * "
+                 "FROM Habits "
+                 "WHERE HabitID = %s"
+                 "AND UserID = %s") 
+        cursor.execute(query, (habit_id, current_user_id))
+        rows = cursor.fetchall()
+        if not rows:
+            return jsonify({"message": "Habit not found"}), 404 #status 404 = Not Found
+        
+        return jsonify(rows), 200 #status 200 = OK
+
+    except Exception as e:
+        # Log the error (optional, but recommended for debugging)
+        print(f"Database error: {e}")
+        
+        # Return a JSON error message and a 500 status code
+        return jsonify({"error": "Internal Server Error", "message": str(e)}), 500 #status 500 = Server Error
+        
+    finally:
+        # Ensure the connection is closed even if an error occurs
+        if 'cursor' in locals():
+            cursor.close()
+        if 'cnx' in locals():
+            cnx.close()
+
+
+@app.route('/habits/<int:habit_id>', methods=['PUT'])
+@token_required
+def update_habit(current_user_id, current_user_is_admin, *args, **kwargs):
+    habit_id = kwargs['habit_id']
+    try:
+        data = request.get_json()
+        if not data:
+            return jsonify({"error": "No data provided"}), 400 #status 400 = Bad Request
+        
+        fields = []
+        values = []
+
+        if 'HabitName' in data:
+            fields.append("HabitName = %s")
+            values.append(data['HabitName'])
+        if 'HabitDescription' in data:
+            fields.append("HabitDescription = %s")
+            values.append(data['HabitDescription']) 
+        if 'HabitStatus' in data:
+            fields.append("HabitStatus = %s")
+            values.append(data['HabitStatus'])
+
+        cnx = get_db_connection()
+        cursor = cnx.cursor(prepared=True)
+        query = ("UPDATE Habits SET " + ", ".join(fields) + " WHERE HabitID = %s AND UserID = %s")
+        values.append(habit_id)
+        values.append(current_user_id)
+        cursor.execute(query, values)
+        cnx.commit()
+    
+        affected = cursor.rowcount
+
+        if affected == 0:
+            return jsonify({"message": "Habit not found"}), 404 #status 404 = Not Found
+
+        else:
+            return jsonify({"message": "Habit updated"}), 200 #status 200 = OK
+
+    except Exception as e:
+        print(f"Database error: {e}")
+        return jsonify({"error": "Internal Server Error", "message": str(e)}), 500 #status 500 = Server Error
+
+    finally:
+        if 'cursor' in locals():
+            cursor.close()
+        if 'cnx' in locals():
+            cnx.close()
+
+
+@app.route('/habits/<int:habit_id>', methods=['DELETE'])
+@token_required
+def delete_habit(current_user_id, current_user_is_admin, *args, **kwargs):
+    habit_id = kwargs['habit_id']
+
+    try:
+        cnx = get_db_connection()
+        cursor = cnx.cursor()   
+        query = ("DELETE "
+                 "FROM Habits "
+                 "WHERE HabitID = %s AND UserID = %s")
+        cursor.execute(query, (habit_id, current_user_id))
+        cnx.commit()
+
+        affected = cursor.rowcount
+
+        if affected == 0:
+            return jsonify({"message": "Habit not found"}), 404 #status 404 = Not Found
+
+        else:
+            return jsonify({"message": "Habit deleted"}), 200 #status 200 = OK
+
+    except Exception as e:
+        print(f"Database error: {e}")
+        
+        return jsonify({"error": "Internal Server Error", "message": str(e)}), 500 #status 500 = Server Error
+        
+    finally:
+        # Ensure the connection is closed even if an error occurs
+        if 'cursor' in locals():
+            cursor.close()
+        if 'cnx' in locals():
+            cnx.close()
+
+
+@app.route('/habits/<int:habit_id>/log', methods=['POST'])
+@token_required
+def create_habit_log(current_user_id, current_user_is_admin, *args, **kwargs):
+    habit_id = kwargs['habit_id']
+    try:
+        data = request.get_json()
+        if not data:
+            return jsonify({"error": "No data provided"}), 400 #status 400 = Bad Request
+
+
+        cnx = get_db_connection()
+        cursor = cnx.cursor(prepared=True)
+
+
+        query = ("INSERT INTO HabitLogs (HabitID, UserID, DateLogged, CompletionStatus) VALUES (%s, %s, %s, %s)")
+        values = (habit_id, current_user_id, data['DateLogged'], data['CompletionStatus'])
+        cursor.execute(query, values)
+        cnx.commit()
+
+        return jsonify({"message": "Habit log created"}), 201 #status 201 = Created
+
+    except Exception as e:
+        print(f"Database error: {e}")
+        return jsonify({"error": "Internal Server Error", "message": str(e)}), 500 #status 500 = Server Error
+
+    finally:
+        if 'cursor' in locals():
+            cursor.close()
+        if 'cnx' in locals():
+            cnx.close()
+
+@app.route('/habits/<int:habit_id>/logs/<int:log_id>', methods=['DELETE'])
+@token_required
+def delete_habit_log(current_user_id, current_user_is_admin, *args, **kwargs):
+    habit_id = kwargs['habit_id']
+    log_id = kwargs['log_id']
+
+    try:
+        cnx = get_db_connection()
+        cursor = cnx.cursor()   
+        query = ("DELETE "
+                 "FROM HabitLogs "
+                 "WHERE HabitLogID = %s AND UserID = %s")
+        cursor.execute(query, (log_id, current_user_id))
+        cnx.commit()
+
+        affected = cursor.rowcount
+
+        if affected == 0:
+            return jsonify({"message": "Habit log not found"}), 404 #status 404 = Not Found
+
+        else:
+            return jsonify({"message": "Habit log deleted"}), 200 #status 200 = OK
+
+    except Exception as e:
+        print(f"Database error: {e}")
+        
+        return jsonify({"error": "Internal Server Error", "message": str(e)}), 500 #status 500 = Server Error
+        
+    finally:
+        # Ensure the connection is closed even if an error occurs
+        if 'cursor' in locals():
+            cursor.close()
+        if 'cnx' in locals():
+            cnx.close()
+
+@app.route('/habits/<int:habit_id>/logs/<int:log_id>', methods=['PUT'])
+@token_required
+def update_habit_log(current_user_id, current_user_is_admin, *args, **kwargs):
+    habit_id = kwargs['habit_id']
+    log_id = kwargs['log_id']
+    try:
+        data = request.get_json()
+        if not data:
+            return jsonify({"error": "No data provided"}), 400 #status 400 = Bad Request
+        
+        fields = []
+        values = []
+
+        if 'DateLogged' in data:
+            fields.append("DateLogged = %s")
+            values.append(data['DateLogged'])
+        if 'CompletionStatus' in data:
+            fields.append("CompletionStatus = %s")
+            values.append(data['CompletionStatus']) 
+
+        cnx = get_db_connection()
+        cursor = cnx.cursor(prepared=True)
+        query = ("UPDATE HabitLogs SET " + ", ".join(fields) + " WHERE HabitLogID = %s AND UserID = %s")
+        values.append(log_id)
+        values.append(current_user_id)
+        cursor.execute(query, values)
+        cnx.commit()
+    
+        affected = cursor.rowcount
+
+        if affected == 0:
+            return jsonify({"message": "Habit log not found"}), 404 #status 404 = Not Found
+
+        else:
+            return jsonify({"message": "Habit log updated"}), 200 #status 200 = OK
+
+    except Exception as e:
+        print(f"Database error: {e}")
+        return jsonify({"error": "Internal Server Error", "message": str(e)}), 500 #status 500 = Server Error
+
+    finally:
+        if 'cursor' in locals():
+            cursor.close()
+        if 'cnx' in locals():
+            cnx.close()
+
+#get specific habit by ID
+@app.route('/habits/<int:habit_id>', methods=['GET'])
+@token_required
+def get_habit_logs(current_user_id, current_user_is_admin, *args, **kwargs):
+    
+    habit_id = kwargs['habit_id']
+    try:
+        cnx = get_db_connection()
+        cursor = cnx.cursor()   
+        query = ("SELECT * "
+                 "FROM HabitLogs "
+                 "WHERE HabitID = %s"
+                 "AND UserID = %s") 
+        cursor.execute(query, (habit_id, current_user_id))
+        rows = cursor.fetchall()
+        if not rows:
+            return jsonify({"message": "Habit logs not found"}), 404 #status 404 = Not Found
+        
+        return jsonify(rows), 200 #status 200 = OK
+
+    except Exception as e:
+        # Log the error (optional, but recommended for debugging)
+        print(f"Database error: {e}")
+        
+        # Return a JSON error message and a 500 status code
+        return jsonify({"error": "Internal Server Error", "message": str(e)}), 500 #status 500 = Server Error
+        
+    finally:
+        # Ensure the connection is closed even if an error occurs
+        if 'cursor' in locals():
+            cursor.close()
+        if 'cnx' in locals():
+            cnx.close()
+
+
+#get specific habit by ID
+@app.route('/friends', methods=['GET'])
+@token_required
+def get_friends(current_user_id, current_user_is_admin, *args, **kwargs):
+    
+    try:
+        cnx = get_db_connection()
+        cursor = cnx.cursor()   
+        query = ("SELECT * "
+                 "FROM Friendships "
+                 "WHERE SenderID = %s"
+                 "AND Status = 'Accepted' ") 
+        cursor.execute(query, (current_user_id,))
+        rows = cursor.fetchall()
+        if not rows:
+            return jsonify({"message": "Friends not found"}), 404 #status 404 = Not Found
+        
+        return jsonify(rows), 200 #status 200 = OK
+
+    except Exception as e:
+        # Log the error (optional, but recommended for debugging)
+        print(f"Database error: {e}")
+        
+        # Return a JSON error message and a 500 status code
+        return jsonify({"error": "Internal Server Error", "message": str(e)}), 500 #status 500 = Server Error
+        
+    finally:
+        # Ensure the connection is closed even if an error occurs
+        if 'cursor' in locals():
+            cursor.close()
+        if 'cnx' in locals():
+            cnx.close()
+
+#get specific habit by ID
+@app.route('/friend_requests/outgoing', methods=['GET'])
+@token_required
+def get_outgoing_friend_requests(current_user_id, current_user_is_admin, *args, **kwargs):
+    
+    try:
+        cnx = get_db_connection()
+        cursor = cnx.cursor()   
+        query = ("SELECT * "
+                 "FROM Friendships "
+                 "WHERE SenderID = %s"
+                 "AND Status = 'Pending' ") 
+        cursor.execute(query, (current_user_id,))
+        rows = cursor.fetchall()
+        if not rows:
+            return jsonify({"message": "Friend requests not found"}), 404 #status 404 = Not Found
+        
+        return jsonify(rows), 200 #status 200 = OK
+
+    except Exception as e:
+        # Log the error (optional, but recommended for debugging)
+        print(f"Database error: {e}")
+        
+        # Return a JSON error message and a 500 status code
+        return jsonify({"error": "Internal Server Error", "message": str(e)}), 500 #status 500 = Server Error
+        
+    finally:
+        # Ensure the connection is closed even if an error occurs
+        if 'cursor' in locals():
+            cursor.close()
+        if 'cnx' in locals():
+            cnx.close()
+
+#get specific habit by ID
+@app.route('/friend_requests/incoming', methods=['GET'])
+@token_required
+def get_incoming_friend_requests(current_user_id, current_user_is_admin, *args, **kwargs):
+    
+    try:
+        cnx = get_db_connection()
+        cursor = cnx.cursor()   
+        query = ("SELECT * "
+                 "FROM Friendships "
+                 "WHERE RecipientID = %s"
+                 "AND Status = 'Pending' ") 
+        cursor.execute(query, (current_user_id,))
+        rows = cursor.fetchall()
+        if not rows:
+            return jsonify({"message": "Friend requests not found"}), 404 #status 404 = Not Found
+        
+        return jsonify(rows), 200 #status 200 = OK
+
+    except Exception as e:
+        # Log the error (optional, but recommended for debugging)
+        print(f"Database error: {e}")
+        
+        # Return a JSON error message and a 500 status code
+        return jsonify({"error": "Internal Server Error", "message": str(e)}), 500 #status 500 = Server Error
+        
+    finally:
+        # Ensure the connection is closed even if an error occurs
+        if 'cursor' in locals():
+            cursor.close()
+        if 'cnx' in locals():
+            cnx.close()
+
+@app.route('/friends/<int:friendship_id>', methods=['DELETE'])
+@token_required
+def delete_friend(current_user_id, current_user_is_admin, *args, **kwargs):
+    friendship_id = kwargs['friendship_id']
+
+    try:
+        cnx = get_db_connection()
+        cursor = cnx.cursor()   
+        query = ("DELETE "
+                 "FROM Friendships "
+                 "WHERE FriendshipID = %s AND (SenderID = %s OR RecipientID = %s)")
+        cursor.execute(query, (friendship_id, current_user_id, current_user_id))
+        cnx.commit()
+
+        affected = cursor.rowcount
+
+        if affected == 0:
+            return jsonify({"message": "Friend not found"}), 404 #status 404 = Not Found
+
+        else:
+            return jsonify({"message": "Friend deleted"}), 200 #status 200 = OK
+
+    except Exception as e:
+        print(f"Database error: {e}")
+        
+        return jsonify({"error": "Internal Server Error", "message": str(e)}), 500 #status 500 = Server Error
+        
+    finally:
+        # Ensure the connection is closed even if an error occurs
+        if 'cursor' in locals():
+            cursor.close()
+        if 'cnx' in locals():
+            cnx.close()
