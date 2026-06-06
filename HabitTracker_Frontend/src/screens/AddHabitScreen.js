@@ -18,7 +18,7 @@ export default function AddHabitScreen({ navigation }) {
     
     try {
       await habitAPI.createHabit({ 
-        habitName: name, 
+        HabitName: name, 
         HabitDescription: description, 
         status: 'active' 
       });
