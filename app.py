@@ -57,7 +57,7 @@ def token_required(f):
         
         try: 
             data = jwt.decode(token, app.config['SECRET_KEY'], algorithms=['HS256'])
-            current_user_id = data['EmployeeID']
+            current_user_id = data['UserID']
             current_user_is_admin = data['AdminPrivileges']
         except jwt.ExpiredSignatureError:
             return jsonify({"error": "Token has expired. Please log in again."}), 401 # status 401 = Unauthorized
@@ -110,22 +110,22 @@ def login():
     db = get_db_connection()
     cursor = db.cursor(dictionary=True) 
 
-    cursor.execute("SELECT * FROM Employees WHERE Email = %s", (data['Email'],))
-    employee = cursor.fetchone()
+    cursor.execute("SELECT * FROM Users WHERE Email = %s", (data['Email'],))
+    user = cursor.fetchone()
     cursor.close()
     db.close()
     
-    if not employee:
+    if not user:
         return jsonify({"error": "Invalid email"}), 401 # status 401 = Unauthorized
     
-    password_valid = bcrypt.checkpw(data['Password'].encode('utf-8'), employee['Password'].encode('utf-8'))
+    password_valid = bcrypt.checkpw(data['Password'].encode('utf-8'), user['Password'].encode('utf-8'))
     if not password_valid:
         return jsonify({"error": "Invalid password"}), 401 # status 401 = Unauthorized
 
     # Citing chatGPT for help with JWT encoding of token below
     token = jwt.encode({
-        'UserID': employee['UserID'],
-        'AdminPrivileges': employee['AdminPrivileges']
+        'UserID': user['UserID'],
+        'AdminPrivileges': user['AdminPrivileges']
     }, app.config['SECRET_KEY'], algorithm='HS256')
 
     return jsonify({"message": "Login successful", "token": token}), 200 # status 200 = OK
@@ -221,63 +221,6 @@ def create_user(current_user_id, current_user_is_admin, *args, **kwargs):
             cursor.close()
         if 'cnx' in locals():
             cnx.close()
-
-
-# @app.route('/employees', methods=['PUT'])
-# @token_required
-# @admin_required
-# def update_employee(current_user_id, current_user_is_admin, *args, **kwargs):
-#     try:
-#         data = request.get_json()
-#         if not data:
-#             return jsonify({"error": "No data provided"}), 400 #status 400 = Bad Request
-        
-#         if 'EmployeeID' not in data:
-#             return jsonify({"error": "EmployeeID is required for update"}), 400 #status 400 = Bad Request
-        
-#         fields = []
-#         values = []
-
-#         if 'EmployeeFirstName' in data:
-#             fields.append("EmployeeFirstName = %s")
-#             values.append(data['EmployeeFirstName'])
-#         if 'EmployeeLastName' in data:
-#             fields.append("EmployeeLastName = %s")
-#             values.append(data['EmployeeLastName']) 
-#         if 'AdminPrivileges' in data:
-#             fields.append("AdminPrivileges = %s")
-#             values.append(data['AdminPrivileges'])
-#         if 'Username' in data:
-#             fields.append("Username = %s")
-#             values.append(data['Username'])
-#         if 'Password' in data:
-#             fields.append("Password = %s")
-#             values.append(data['Password'])
-
-#         cnx = get_db_connection()
-#         cursor = cnx.cursor(prepared=True)
-#         query = ("UPDATE Employees SET " + ", ".join(fields) + " WHERE EmployeeID = %s")
-#         values.append(data['EmployeeID'])
-#         cursor.execute(query, values)
-#         cnx.commit()
-    
-#         affected = cursor.rowcount
-
-#         if affected == 0:
-#             return jsonify({"message": "Employee not found"}), 404 #status 404 = Not Found
-
-#         else:
-#             return jsonify({"message": "Employee updated"}), 200 #status 200 = OK
-
-#     except Exception as e:
-#         print(f"Database error: {e}")
-#         return jsonify({"error": "Internal Server Error", "message": str(e)}), 500 #status 500 = Server Error
-
-#     finally:
-#         if 'cursor' in locals():
-#             cursor.close()
-#         if 'cnx' in locals():
-#             cnx.close()
             
 
 @app.route('/users/me', methods=['PUT'])
@@ -344,7 +287,7 @@ def delete_users(current_user_id, current_user_is_admin, *args, **kwargs):
         query = ("DELETE "
                  "FROM Users "
                  "WHERE UserID = %s")
-        cursor.execute(query, (current_user_id))
+        cursor.execute(query, (current_user_id,))
         cnx.commit()
 
         affected = cursor.rowcount
@@ -412,7 +355,7 @@ def get_habit(current_user_id, current_user_is_admin, *args, **kwargs):
         cursor = cnx.cursor()   
         query = ("SELECT * "
                  "FROM Habits "
-                 "WHERE HabitID = %s"
+                 "WHERE HabitID = %s "
                  "AND UserID = %s") 
         cursor.execute(query, (habit_id, current_user_id))
         rows = cursor.fetchall()
@@ -633,7 +576,7 @@ def update_habit_log(current_user_id, current_user_is_admin, *args, **kwargs):
             cnx.close()
 
 #get specific habit by ID
-@app.route('/habits/<int:habit_id>', methods=['GET'])
+@app.route('/habits/<int:habit_id>/logs', methods=['GET'])
 @token_required
 def get_habit_logs(current_user_id, current_user_is_admin, *args, **kwargs):
     
@@ -643,7 +586,7 @@ def get_habit_logs(current_user_id, current_user_is_admin, *args, **kwargs):
         cursor = cnx.cursor()   
         query = ("SELECT * "
                  "FROM HabitLogs "
-                 "WHERE HabitID = %s"
+                 "WHERE HabitID = %s "
                  "AND UserID = %s") 
         cursor.execute(query, (habit_id, current_user_id))
         rows = cursor.fetchall()
@@ -776,7 +719,7 @@ def delete_friend(current_user_id, current_user_is_admin, *args, **kwargs):
         cursor = cnx.cursor()   
         query = ("DELETE "
                  "FROM Friendships "
-                 "WHERE FriendshipID = %s AND (SenderID = %s OR RecipientID = %s)")
+                 "WHERE FriendshipID = %s AND (SenderID = %s OR RecipientID = %s) AND FriendshipStatus = 'Accepted'")
         cursor.execute(query, (friendship_id, current_user_id, current_user_id))
         cnx.commit()
 
@@ -795,6 +738,129 @@ def delete_friend(current_user_id, current_user_is_admin, *args, **kwargs):
         
     finally:
         # Ensure the connection is closed even if an error occurs
+        if 'cursor' in locals():
+            cursor.close()
+        if 'cnx' in locals():
+            cnx.close()
+
+@app.route('/friend_requests', methods=['POST'])
+@token_required
+def send_friend_request(current_user_id, current_user_is_admin, *args, **kwargs):
+    try:
+        data = request.get_json()
+        if not data:
+            return jsonify({"error": "No data provided"}), 400 #status 400 = Bad Request
+
+
+        cnx = get_db_connection()
+        cursor = cnx.cursor(prepared=True)
+
+
+        query = ("INSERT INTO Friendships (SenderID, RecipientID, Status) VALUES (%s, %s, %s)")
+        values = (current_user_id, data['RecipientID'], 'Pending')
+        cursor.execute(query, values)
+        cnx.commit()
+
+        return jsonify({"message": "Friend request sent"}), 201 #status 201 = Created
+
+    except Exception as e:
+        print(f"Database error: {e}")
+        return jsonify({"error": "Internal Server Error", "message": str(e)}), 500 #status 500 = Server Error
+
+    finally:
+        if 'cursor' in locals():
+            cursor.close()
+        if 'cnx' in locals():
+            cnx.close()
+
+
+@app.route('/friend_requests/<int:request_id>', methods=['PUT'])
+@token_required
+def accept_friend_request(current_user_id, current_user_is_admin, *args, **kwargs):
+    request_id = kwargs['request_id']
+    try:
+        cnx = get_db_connection()
+        cursor = cnx.cursor(prepared=True)
+        query = ("UPDATE Friendships SET FriendshipStatus = %s WHERE FriendshipID = %s AND RecipientID = %s AND FriendshipStatus = %s")
+        values = ("Accepted", request_id, current_user_id, "Pending")
+
+        cursor.execute(query, values)
+        cnx.commit()
+    
+        affected = cursor.rowcount
+
+        if affected == 0:
+            return jsonify({"message": "Friend request not found"}), 404 #status 404 = Not Found
+
+        else:
+            return jsonify({"message": "Friend request updated"}), 200 #status 200 = OK
+
+    except Exception as e:
+        print(f"Database error: {e}")
+        return jsonify({"error": "Internal Server Error", "message": str(e)}), 500 #status 500 = Server Error
+
+    finally:
+        if 'cursor' in locals():
+            cursor.close()
+        if 'cnx' in locals():
+            cnx.close()
+
+@app.route('/friend_request/<int:friendship_id>', methods=['DELETE'])
+@token_required
+def reject_friend_request(current_user_id, current_user_is_admin, *args, **kwargs):
+    friendship_id = kwargs['friendship_id']
+
+    try:
+        cnx = get_db_connection()
+        cursor = cnx.cursor()   
+        query = ("DELETE "
+                 "FROM Friendships "
+                 "WHERE FriendshipID = %s AND (SenderID = %s OR RecipientID = %s) AND FriendshipStatus = 'Pending'")
+        cursor.execute(query, (friendship_id, current_user_id, current_user_id))
+        cnx.commit()
+
+        affected = cursor.rowcount
+
+        if affected == 0:
+            return jsonify({"message": "Friend not found"}), 404 #status 404 = Not Found
+
+        else:
+            return jsonify({"message": "Friend deleted"}), 200 #status 200 = OK
+
+    except Exception as e:
+        print(f"Database error: {e}")
+        
+        return jsonify({"error": "Internal Server Error", "message": str(e)}), 500 #status 500 = Server Error
+        
+    finally:
+        # Ensure the connection is closed even if an error occurs
+        if 'cursor' in locals():
+            cursor.close()
+        if 'cnx' in locals():
+            cnx.close()
+
+@app.route('/habits/friends', methods=['GET'])
+@token_required
+def get_friend_habits(current_user_id, current_user_is_admin, *args, **kwargs):
+    try:
+        cnx = get_db_connection()
+        cursor = cnx.cursor()   
+        query = ("SELECT h.* "
+                 "FROM Habits h "
+                "JOIN Friendships f "
+                "ON (f.SenderID = %s AND f.RecipientID = h.UserID OR f.RecipientID = %s AND f.SenderID = h.UserID) "
+                 "WHERE f.FriendshipStatus = 'Accepted' ")
+        cursor.execute(query, (current_user_id, current_user_id))
+        rows = cursor.fetchall()
+        
+        return jsonify(rows), 200 #status 200 = OK
+
+    except Exception as e:
+        print(f"Database error: {e}")
+        
+        return jsonify({"error": "Internal Server Error", "message": str(e)}), 500 #status 500 = Server Error
+        
+    finally:
         if 'cursor' in locals():
             cursor.close()
         if 'cnx' in locals():
