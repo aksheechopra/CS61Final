@@ -5,6 +5,7 @@ Note that we downgraded from newest Expo SDK 56 to SDK 54 so that testing is sup
 ```
 npm install @react-navigation/native@^6.1.9 @react-navigation/native-stack@^6.9.17
 npx expo install react-native-screens react-native-safe-area-context
+npm install @react-navigation/bottom-tabs@^6.5.11
 
 npx expo install react-native-gesture-handler
 
