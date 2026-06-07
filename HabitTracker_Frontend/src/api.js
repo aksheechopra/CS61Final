@@ -65,7 +65,13 @@ export const authAPI = {
 };
 
 export const userAPI = {
-  updateMe: (data) => withDelay({ ...mockUsers[0], ...data }),
+  getMe: () => withDelay(mockUsers[0]),
+  
+  // allows edits to persist across reloads in a session
+  updateMe: (data) => {
+    mockUsers[0] = { ...mockUsers[0], ...data };
+    return withDelay(mockUsers[0]);
+  },
   deleteMe: () => withDelay({ success: true }),
   deleteUser: (id) => {
     mockUsers = mockUsers.filter(u => u.UserID !== id);
@@ -136,8 +142,60 @@ export const logAPI = {
   },
 };
 
+const SAMPLE_HABITS = [
+  { HabitName: 'Morning Run', HabitDescription: '3 mile loop' },
+  { HabitName: 'Read', HabitDescription: '20 pages a day' },
+  { HabitName: 'Meditation', HabitDescription: '10 minutes' },
+  { HabitName: 'Hydrate', HabitDescription: '8 glasses of water' },
+  { HabitName: 'Journal', HabitDescription: 'One page nightly' },
+  { HabitName: 'Stretch', HabitDescription: 'Full body, 15 min' },
+];
+
 export const friendAPI = {
-  getRecentActivity: () => withDelay(mockActivity), 
+  getRecentActivity: () => withDelay(mockActivity),
+
+  getFriendProfile: (friendId) => {
+    const user = mockUsers.find(u => u.UserID === friendId);
+    if (!user) return withDelay(null);
+
+    const totalHabits = (friendId * 2) % 4 + 3;
+    const completed = (friendId * 3) % totalHabits;
+    const failed = Math.max(0, totalHabits - completed - 1);
+    const longestStreak = (friendId * 7) % 18 + 4;
+
+    const habits = SAMPLE_HABITS.slice(0, totalHabits).map((h, i) => ({
+      HabitID: friendId * 100 + i,
+      UserID: friendId,
+      HabitName: h.HabitName,
+      HabitDescription: h.HabitDescription,
+      Streak: ((friendId + i) * 3) % 14,
+      completedToday: i < completed,
+    }));
+
+    const logDates = [];
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const density = 0.25 + ((friendId * 13) % 40) / 100;
+    
+    // seeded this by friendId so each heatmap stays consistent per person
+    for (let i = 0; i < 12 * 7; i++) {
+      const d = new Date(today);
+      d.setDate(today.getDate() - i);
+      const rand = (((friendId + 1) * 9301 + i * 49297) % 233280) / 233280;
+      if (rand < density) {
+        const n = 1 + Math.floor(rand * 5) % 4;
+        for (let k = 0; k < n; k++) logDates.push(new Date(d));
+      }
+    }
+
+    return withDelay({
+      user: { ...user, id: user.UserID, name: user.Name, email: user.Email },
+      stats: { totalHabits, completedToday: completed, failedToday: failed, longestStreak },
+      habits,
+      logDates,
+    });
+  },
+
   getFriends: () => {
     const friendIds = mockFriendships
       .filter(f => f.Status === 1 && (f.SenderID === CURRENT_USER_ID || f.RecipientID === CURRENT_USER_ID))

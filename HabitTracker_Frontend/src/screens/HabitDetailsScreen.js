@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react';
-import { View, Text, TextInput, Button, StyleSheet, FlatList, Alert } from 'react-native';
+import { View, Text, TextInput, Button, StyleSheet, FlatList, Alert, TouchableOpacity } from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
 import { habitAPI, logAPI } from '../api';
 
 /* 
@@ -36,7 +37,9 @@ export default function HabitDetailsScreen({ route, navigation }) {
         const logsRes = await logAPI.getLogs(habitId);
         
         setHabit(habitRes.data);
-        setName(habitRes.data.habitName || '');
+        
+        // helps keep reads and writes concistent
+        setName(habitRes.data.HabitName || '');
         setDescription(habitRes.data.HabitDescription || '');
         setLogs(logsRes.data || []);
       } catch (error) {
@@ -49,16 +52,38 @@ export default function HabitDetailsScreen({ route, navigation }) {
   const handleUpdate = async () => {
     try {
       // Save any edits made to the habits
-      await habitAPI.updateHabit(habitId, { 
-        habitName: name, 
-        HabitDescription: description, 
-        status: habit?.status 
+      await habitAPI.updateHabit(habitId, {
+        HabitName: name,
+        HabitDescription: description,
+        Status: habit?.Status
       });
       Alert.alert("Success", "Habit updated!");
       navigation.goBack();
     } catch (error) {
       Alert.alert("Error", "Could not update habit.");
     }
+  };
+
+  const handleDelete = () => {
+    Alert.alert(
+      'Delete habit',
+      `Delete "${habit?.HabitName || 'this habit'}"? This can't be undone.`,
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Delete',
+          style: 'destructive',
+          onPress: async () => {
+            try {
+              await habitAPI.deleteHabit(habitId);
+              navigation.goBack();
+            } catch (e) {
+              Alert.alert('Error', 'Could not delete habit.');
+            }
+          },
+        },
+      ]
+    );
   };
 
   // loading screen
@@ -85,6 +110,15 @@ export default function HabitDetailsScreen({ route, navigation }) {
         )}
         ListEmptyComponent={<Text>No logs yet. Swipe left on home screen to complete!</Text>}
       />
+
+      <TouchableOpacity
+        style={styles.deleteButton}
+        onPress={handleDelete}
+        activeOpacity={0.8}
+      >
+        <Ionicons name="trash-outline" size={18} color="#EF4444" />
+        <Text style={styles.deleteButtonText}>Delete Habit</Text>
+      </TouchableOpacity>
     </View>
   );
 }
@@ -94,5 +128,18 @@ const styles = StyleSheet.create({
   label: { fontSize: 16, fontWeight: 'bold', marginTop: 10 },
   input: { borderWidth: 1, borderColor: '#ccc', borderRadius: 8, padding: 10, marginTop: 5, marginBottom: 15 },
   sectionTitle: { fontSize: 20, fontWeight: 'bold', marginTop: 25, marginBottom: 10 },
-  logBox: { padding: 15, backgroundColor: '#f0f0f0', borderRadius: 8, marginBottom: 10 }
+  logBox: { padding: 15, backgroundColor: '#f0f0f0', borderRadius: 8, marginBottom: 10 },
+  deleteButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#FFFFFF',
+    borderRadius: 16,
+    paddingVertical: 14,
+    marginTop: 16,
+    gap: 8,
+    borderWidth: 1,
+    borderColor: '#FECACA',
+  },
+  deleteButtonText: { color: '#EF4444', fontSize: 15, fontWeight: '700', marginLeft: 6 },
 });

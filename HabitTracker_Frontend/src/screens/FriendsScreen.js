@@ -58,17 +58,15 @@ export default function FriendsScreen({ navigation }) {
 
     const fetchNetworkData = async () => {
         try {
-            setLoading(true);
-            // We use the following api calls to retrieve info from our db backend api
-            // Executing these asynchronous calls concurrently with Promise.all reduces the total network wait time before resolving the loading state
+            // allows initial state to cover first load, and then refocus refreshes silently
             const [friendsRes, requestsRes, activityRes] = await Promise.all([
                 friendAPI.getFriends(),
                 friendAPI.getRequests(),
-                friendAPI.getRecentActivity() 
+                friendAPI.getRecentActivity()
             ]);
             setFriends(friendsRes.data);
             setPendingRequests(requestsRes.data);
-            setRecentActivity(activityRes.data); 
+            setRecentActivity(activityRes.data);
         } catch (error) {
             console.error("Failed to fetch network data:", error);
             Alert.alert("Error", "Could not load your network.");
