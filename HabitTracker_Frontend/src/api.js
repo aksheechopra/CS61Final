@@ -301,6 +301,7 @@ export const authAPI = {
  
 // USER API
 export const userAPI = {
+  getMe: () => api.get('/users/me'),
   updateMe: (data) => api.put('/users/me', data),
   deleteMe: () => api.delete('/users/me'),
   deleteUser: (id) => api.delete(`/users/${id}`), // Admin only

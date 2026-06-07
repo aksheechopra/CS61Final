@@ -280,6 +280,26 @@ def create_user(current_user_id, current_user_is_admin, *args, **kwargs):
             cnx.close()
             
 
+@app.route('/users/me', methods=['GET'])
+@token_required
+def get_me(current_user_id, current_user_is_admin, *args, **kwargs):
+    try:
+        cnx = get_db_connection()
+        cursor = cnx.cursor(dictionary=True)
+        cursor.execute("SELECT UserID, FirstName, LastName, Email, AdminPrivileges FROM Users WHERE UserID = %s",
+                       (current_user_id,))
+        row = cursor.fetchone()
+        if not row:
+            return jsonify({"error": "Not found"}), 404
+        row['Name'] = f"{row.get('FirstName','')} {row.get('LastName','')}".strip()
+        return jsonify(row), 200
+    except Exception as e:
+        return jsonify({"error": "Internal Server Error", "message": str(e)}), 500
+    finally:
+        if 'cursor' in locals(): cursor.close()
+        if 'cnx' in locals(): cnx.close()
+
+
 @app.route('/users/me', methods=['PUT'])
 @token_required
 def update_me(current_user_id, current_user_is_admin, *args, **kwargs):
@@ -547,7 +567,24 @@ def create_habit_log(current_user_id, current_user_is_admin, *args, **kwargs):
         cursor.execute(query, values)
         cnx.commit()
 
-        return jsonify({"message": "Habit log created"}), 201 #status 201 = Created
+        # handle streak w count of consecutive days ending today with at least one log
+        day_cursor = cnx.cursor(dictionary=True)
+        day_cursor.execute(
+            "SELECT DISTINCT DATE(DateLogged) AS d FROM HabitLogs WHERE HabitID = %s AND UserID = %s",
+            (habit_id, current_user_id),
+        )
+        days = {r['d'] for r in day_cursor.fetchall()}
+        from datetime import date, timedelta
+        streak = 0
+        d = date.today()
+        while d in days:
+            streak += 1
+            d -= timedelta(days=1)
+        day_cursor.execute("UPDATE Habits SET Streak = %s WHERE HabitID = %s", (streak, habit_id))
+        cnx.commit()
+        day_cursor.close()
+
+        return jsonify({"message": "Habit log created", "streak": streak}), 201 #status 201 = Created
 
     except Exception as e:
         print(f"Database error: {e}")
@@ -727,8 +764,8 @@ def get_outgoing_friend_requests(current_user_id, current_user_is_admin, *args, 
         cursor = cnx.cursor(dictionary=True)  
         query = ("SELECT * "
                  "FROM Friendships "
-                 "WHERE SenderID = %s"
-                 "AND FriendshipStatus = 'Pending' ") 
+                 "WHERE SenderID = %s "
+                 "AND FriendshipStatus = 'Pending'")
         cursor.execute(query, (current_user_id,))
         rows = cursor.fetchall()
         # Return empty list when there are no pending incoming requests
@@ -757,7 +794,7 @@ def get_incoming_friend_requests(current_user_id, current_user_is_admin, *args, 
         cursor = cnx.cursor(dictionary=True)
         query = """
             SELECT 
-                f.FriendshipID as id, 
+                f.RequestID as id,
                 CONCAT(u.FirstName, ' ', u.LastName) as senderName
             FROM Friendships f
             JOIN Users u ON f.SenderID = u.UserID
@@ -782,18 +819,19 @@ def get_incoming_friend_requests(current_user_id, current_user_is_admin, *args, 
         if 'cnx' in locals():
             cnx.close()
 
-@app.route('/friends/<int:friendship_id>', methods=['DELETE'])
+@app.route('/friends/<int:friend_id>', methods=['DELETE'])
 @token_required
 def delete_friend(current_user_id, current_user_is_admin, *args, **kwargs):
-    friendship_id = kwargs['friendship_id']
+    friend_id = kwargs['friend_id']
 
     try:
         cnx = get_db_connection()
-        cursor = cnx.cursor()   
-        query = ("DELETE "
-                 "FROM Friendships "
-                 "WHERE FriendshipID = %s AND (SenderID = %s OR RecipientID = %s) AND FriendshipStatus = 'Accepted'")
-        cursor.execute(query, (friendship_id, current_user_id, current_user_id))
+        cursor = cnx.cursor()
+        # frontend passes the other user's UserID, not the RequestID
+        query = ("DELETE FROM Friendships "
+                 "WHERE FriendshipStatus = 'Accepted' "
+                 "AND ((SenderID = %s AND RecipientID = %s) OR (SenderID = %s AND RecipientID = %s))")
+        cursor.execute(query, (current_user_id, friend_id, friend_id, current_user_id))
         cnx.commit()
 
         affected = cursor.rowcount
@@ -854,7 +892,7 @@ def accept_friend_request(current_user_id, current_user_is_admin, *args, **kwarg
     try:
         cnx = get_db_connection()
         cursor = cnx.cursor(prepared=True)
-        query = ("UPDATE Friendships SET FriendshipStatus = %s WHERE FriendshipID = %s AND RecipientID = %s AND FriendshipStatus = %s")
+        query = ("UPDATE Friendships SET FriendshipStatus = %s WHERE RequestID = %s AND RecipientID = %s AND FriendshipStatus = %s")
         values = ("Accepted", request_id, current_user_id, "Pending")
 
         cursor.execute(query, values)
@@ -888,7 +926,7 @@ def reject_friend_request(current_user_id, current_user_is_admin, *args, **kwarg
         cursor = cnx.cursor()   
         query = ("DELETE "
                  "FROM Friendships "
-                 "WHERE FriendshipID = %s AND (SenderID = %s OR RecipientID = %s) AND FriendshipStatus = 'Pending'")
+                 "WHERE RequestID = %s AND (SenderID = %s OR RecipientID = %s) AND FriendshipStatus = 'Pending'")
         cursor.execute(query, (friendship_id, current_user_id, current_user_id))
         cnx.commit()
 
