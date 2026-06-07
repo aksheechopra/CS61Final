@@ -105,7 +105,7 @@ export default function HabitDetailsScreen({ route, navigation }) {
         keyExtractor={(item, index) => (item?.id || item?._id || index).toString()}
         renderItem={({ item }) => (
           <View style={styles.logBox}>
-            <Text>Logged: {item?.date ? new Date(item.date).toLocaleDateString() : 'Unknown Date'}</Text>
+            <Text>Logged: {item?.DateLogged ? new Date(item.DateLogged).toLocaleDateString() : 'Unknown Date'}</Text>
           </View>
         )}
         ListEmptyComponent={<Text>No logs yet. Swipe left on home screen to complete!</Text>}

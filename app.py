@@ -313,6 +313,12 @@ def update_me(current_user_id, current_user_is_admin, *args, **kwargs):
         fields = []
         values = []
 
+        # frontend sends a single "Name" — split on first space
+        if 'Name' in data and 'FirstName' not in data:
+            parts = (data['Name'] or '').strip().split(' ', 1)
+            data['FirstName'] = parts[0]
+            data['LastName'] = parts[1] if len(parts) > 1 else ''
+
         if 'FirstName' in data:
             fields.append("FirstName = %s")
             values.append(data['FirstName'])
