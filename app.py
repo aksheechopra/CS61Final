@@ -3,6 +3,7 @@ from functools import wraps
 from datetime import datetime
 import bcrypt
 from flask import Flask, jsonify, request
+from flask_cors import CORS
 import mysql.connector
 import json
 import jwt
@@ -31,6 +32,7 @@ Usage:
 '''
 
 app = Flask(__name__)
+CORS(app)
 
 # Load credentials from the JSON file
 with open('db.json') as config_file:
@@ -558,9 +560,12 @@ def create_habit_log(current_user_id, current_user_is_admin, *args, **kwargs):
         cnx = get_db_connection()
         cursor = cnx.cursor(prepared=True)
         
-        # accepts camelcase 
+        # accepts camelcase
         date_logged = data.get('DateLogged') or data.get('date') or data.get('dateLogged')
         completion_status = data.get('CompletionStatus', data.get('completionStatus', 'Completed'))
+        # normalize ISO 2026-06-07T17:48:22.000Z -> 2026-06-07 17:48:22
+        if isinstance(date_logged, str):
+            date_logged = date_logged.replace('T', ' ').replace('Z', '').split('.')[0]
 
         query = ("INSERT INTO HabitLogs (HabitID, UserID, DateLogged, CompletionStatus) VALUES (%s, %s, %s, %s)")
         values = (habit_id, current_user_id, date_logged , completion_status)
