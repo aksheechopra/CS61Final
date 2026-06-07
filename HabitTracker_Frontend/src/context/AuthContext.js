@@ -35,6 +35,24 @@ export const AuthProvider = ({ children }) => {
     }
   };
 
+  const register = async (firstName, lastName, email, password) => {
+    try {
+      const response = await authAPI.register({
+        FirstName: firstName,
+        LastName: lastName,
+        Email: email,
+        Password: password,
+      });
+      const { token } = response.data;
+
+      // Log the user in immediately after registering
+      await SecureStore.setItemAsync('userToken', token);
+      setUserToken(token);
+    } catch (error) {
+      throw error;
+    }
+  };
+
   const logout = async () => {
     try {
       await authAPI.logout(); 
@@ -48,7 +66,7 @@ export const AuthProvider = ({ children }) => {
   };
 
   return (
-    <AuthContext.Provider value={{ userToken, login, logout, isLoading }}>
+    <AuthContext.Provider value={{ userToken, login, logout, register, isLoading }}>
       {children}
     </AuthContext.Provider>
   );

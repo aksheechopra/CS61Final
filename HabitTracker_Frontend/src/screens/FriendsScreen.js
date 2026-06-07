@@ -58,18 +58,24 @@ export default function FriendsScreen({ navigation }) {
 
     const fetchNetworkData = async () => {
         try {
-            // allows initial state to cover first load, and then refocus refreshes silently
-            const [friendsRes, requestsRes, activityRes] = await Promise.all([
+            // Fetch all three independently so a 404/error on one doesn't wipe the whole screen
+            const [friendsRes, requestsRes, activityRes] = await Promise.allSettled([
                 friendAPI.getFriends(),
                 friendAPI.getRequests(),
                 friendAPI.getRecentActivity()
             ]);
-            setFriends(friendsRes.data);
-            setPendingRequests(requestsRes.data);
-            setRecentActivity(activityRes.data);
+
+            if (friendsRes.status === 'fulfilled') {
+                setFriends(Array.isArray(friendsRes.value.data) ? friendsRes.value.data : []);
+            }
+            if (requestsRes.status === 'fulfilled') {
+                setPendingRequests(Array.isArray(requestsRes.value.data) ? requestsRes.value.data : []);
+            }
+            if (activityRes.status === 'fulfilled') {
+                setRecentActivity(Array.isArray(activityRes.value.data) ? activityRes.value.data : []);
+            }
         } catch (error) {
             console.error("Failed to fetch network data:", error);
-            Alert.alert("Error", "Could not load your network.");
         } finally {
             setLoading(false);
         }
