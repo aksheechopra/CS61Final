@@ -1,0 +1,9 @@
+{
+  "jwt_secret_key": "dev-secret-change-me",
+  "localhost": {
+    "host": "localhost",
+    "user": "api_user",
+    "password": "password101",
+    "database": "habits"
+  }
+}
