@@ -1,11 +1,12 @@
-import 'react-native-gesture-handler'; 
+import 'react-native-gesture-handler';
 import React, { useContext } from 'react';
-import { ActivityIndicator, View } from 'react-native';
+import { ActivityIndicator, View, TouchableOpacity, StyleSheet } from 'react-native';
 import { NavigationContainer } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
-import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
+import { createMaterialTopTabNavigator } from '@react-navigation/material-top-tabs';
 import { Ionicons } from '@expo/vector-icons';
-import { GestureHandlerRootView } from 'react-native-gesture-handler'; 
+import { GestureHandlerRootView } from 'react-native-gesture-handler';
+import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { AuthProvider, AuthContext } from './src/context/AuthContext';
 import LoginScreen from './src/screens/LoginScreen';
@@ -17,12 +18,52 @@ import FriendsScreen from './src/screens/FriendsScreen';
 
 import FriendProfileScreen from './src/screens/FriendProfileScreen'; 
 
-/*
-Controls layout of App and Routing
-*/
-
 const Stack = createNativeStackNavigator();
-const Tab = createBottomTabNavigator();
+const Tab = createMaterialTopTabNavigator();
+
+
+// custom tab bar so that the top tab navigator looks like a bottom one. (needed this for swiping functionality)
+function BottomTabBar({ state, navigation }) {
+  return (
+    <SafeAreaView edges={['bottom']} style={styles.tabBarSafeArea}>
+      <View style={styles.tabBar}>
+        {state.routes.map((route, index) => {
+          const focused = state.index === index;
+          const color = focused ? '#3B82F6' : '#94A3B8';
+
+          let iconName = 'ellipse';
+          if (route.name === 'Home') iconName = 'home';
+          else if (route.name === 'Profile') iconName = 'stats-chart';
+          else if (route.name === 'Friends') iconName = 'people';
+
+          const onPress = () => {
+            const event = navigation.emit({
+              type: 'tabPress',
+              target: route.key,
+              canPreventDefault: true,
+            });
+            if (!focused && !event.defaultPrevented) {
+              navigation.navigate(route.name);
+            }
+          };
+
+          return (
+            <TouchableOpacity
+              key={route.key}
+              accessibilityRole="button"
+              accessibilityState={focused ? { selected: true } : {}}
+              onPress={onPress}
+              style={styles.tabItem}
+              activeOpacity={0.7}
+            >
+              <Ionicons name={iconName} size={24} color={color} />
+            </TouchableOpacity>
+          );
+        })}
+      </View>
+    </SafeAreaView>
+  );
+}
 
 function HomeStackNavigator() {
   return (
@@ -67,25 +108,18 @@ function FriendsStackNavigator() {
   );
 }
 
+
+// allows users to swipe between tabs
 function MainTabs() {
   return (
-    <Tab.Navigator screenOptions={({ route }) => ({
-      tabBarIcon: ({ color, size }) => {
-        let iconName;
-        if (route.name === 'Home') iconName = 'home';
-        else if (route.name === 'Profile') iconName = 'stats-chart';
-        else if (route.name === 'Friends') iconName = 'people';
-        
-        return <Ionicons name={iconName} size={size} color={color} />;
-      },
-      headerShown: false, 
-      tabBarStyle: {
-        backgroundColor: '#FFFFFF',
-        borderTopColor: '#F1F5F9',
-        elevation: 0,
-        shadowOpacity: 0,
-      }
-    })}>
+    <Tab.Navigator
+      tabBarPosition="bottom"
+      tabBar={(props) => <BottomTabBar {...props} />}
+      screenOptions={{
+        swipeEnabled: true,
+        animationEnabled: true,
+      }}
+    >
       <Tab.Screen name="Home" component={HomeStackNavigator} />
       <Tab.Screen name="Profile" component={CalendarScreen} />
       <Tab.Screen name="Friends" component={FriendsStackNavigator} />
@@ -126,3 +160,21 @@ export default function App() {
     </GestureHandlerRootView>
   );
 }
+
+const styles = StyleSheet.create({
+  tabBarSafeArea: {
+    backgroundColor: '#FFFFFF',
+    borderTopWidth: 1,
+    borderTopColor: '#F1F5F9',
+  },
+  tabBar: {
+    flexDirection: 'row',
+    height: 56,
+    backgroundColor: '#FFFFFF',
+  },
+  tabItem: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+});
